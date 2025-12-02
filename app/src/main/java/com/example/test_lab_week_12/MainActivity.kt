@@ -4,13 +4,16 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.test_lab_week_12.model.Movie
 import com.google.android.material.snackbar.Snackbar
-import java.util.Calendar
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,12 +27,10 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this@MainActivity, "Clicked: ${movie.title}", Toast.LENGTH_SHORT).show()
 
                 val intent = Intent(this@MainActivity, DetailsActivity::class.java)
-
                 intent.putExtra(DetailsActivity.EXTRA_TITLE, movie.title)
                 intent.putExtra(DetailsActivity.EXTRA_RELEASE, movie.releaseDate)
                 intent.putExtra(DetailsActivity.EXTRA_OVERVIEW, movie.overview)
                 intent.putExtra(DetailsActivity.EXTRA_POSTER, movie.posterPath)
-
                 startActivity(intent)
             }
         })
@@ -47,23 +48,27 @@ class MainActivity : AppCompatActivity() {
             }
         )[MovieViewModel::class.java]
 
-        movieViewModel.popularMovies.observe(this) { popularMovies ->
-            val currentYear = Calendar.getInstance().get(Calendar.YEAR).toString()
+        // --- PART 2 & ASSIGNMENT: MENGGUNAKAN FLOW COLLECT [cite: 216-238] ---
+        // Menggunakan lifecycleScope untuk mengumpulkan data dari StateFlow
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
 
-            movieAdapter.addMovies(
-                popularMovies
-                    .filter { movie ->
-                        movie.releaseDate?.startsWith(currentYear) == true
+                // Launch coroutine untuk movies
+                launch {
+                    movieViewModel.popularMovies.collect { movies ->
+                        // Tidak perlu filter/sort di sini lagi karena sudah dilakukan di ViewModel (Assignment)
+                        movieAdapter.addMovies(movies)
                     }
-                    .sortedByDescending { movie ->
-                        movie.popularity
-                    }
-            )
-        }
+                }
 
-        movieViewModel.error.observe(this) { error ->
-            if (error.isNotEmpty()) {
-                Snackbar.make(recyclerView, error, Snackbar.LENGTH_LONG).show()
+                // Launch coroutine untuk error
+                launch {
+                    movieViewModel.error.collect { error ->
+                        if (error.isNotEmpty()) {
+                            Snackbar.make(recyclerView, error, Snackbar.LENGTH_LONG).show()
+                        }
+                    }
+                }
             }
         }
     }
