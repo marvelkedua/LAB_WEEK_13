@@ -1,45 +1,51 @@
-package com.example.test_lab_week_12
+package com.example.test_lab_week_13
 
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.Lifecycle
+import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.test_lab_week_12.model.Movie
+import com.example.test_lab_week_13.databinding.ActivityMainBinding
+import com.example.test_lab_week_13.model.Movie
 import com.google.android.material.snackbar.Snackbar
-import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        val recyclerView: RecyclerView = findViewById(R.id.movie_list)
+        // 1. Setup DataBinding
+        // Pastikan layout XML Anda juga menggunakan package 'test_lab_week_13' di bagian <variable>
+        val binding: ActivityMainBinding = DataBindingUtil.setContentView(this, R.layout.activity_main)
 
+        // 2. Setup Adapter
         val movieAdapter = MovieAdapter(object : MovieAdapter.MovieClickListener {
             override fun onMovieClick(movie: Movie) {
                 Toast.makeText(this@MainActivity, "Clicked: ${movie.title}", Toast.LENGTH_SHORT).show()
 
                 val intent = Intent(this@MainActivity, DetailsActivity::class.java)
+
+                // PERBAIKAN: Kirim data satu per satu (String) agar 'putExtra' tidak error
+                // Kita ambil konstanta kunci dari DetailsActivity
                 intent.putExtra(DetailsActivity.EXTRA_TITLE, movie.title)
                 intent.putExtra(DetailsActivity.EXTRA_RELEASE, movie.releaseDate)
                 intent.putExtra(DetailsActivity.EXTRA_OVERVIEW, movie.overview)
                 intent.putExtra(DetailsActivity.EXTRA_POSTER, movie.posterPath)
+
                 startActivity(intent)
             }
         })
 
-        recyclerView.layoutManager = LinearLayoutManager(this)
-        recyclerView.adapter = movieAdapter
+        // Access RecyclerView via binding object
+        binding.movieList.layoutManager = LinearLayoutManager(this)
+        binding.movieList.adapter = movieAdapter
 
+        // Setup Repository
         val movieRepository = (application as MovieApplication).movieRepository
 
+        // Setup ViewModel
         val movieViewModel = ViewModelProvider(
             this, object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -48,28 +54,8 @@ class MainActivity : AppCompatActivity() {
             }
         )[MovieViewModel::class.java]
 
-        // --- PART 2 & ASSIGNMENT: MENGGUNAKAN FLOW COLLECT [cite: 216-238] ---
-        // Menggunakan lifecycleScope untuk mengumpulkan data dari StateFlow
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-
-                // Launch coroutine untuk movies
-                launch {
-                    movieViewModel.popularMovies.collect { movies ->
-                        // Tidak perlu filter/sort di sini lagi karena sudah dilakukan di ViewModel (Assignment)
-                        movieAdapter.addMovies(movies)
-                    }
-                }
-
-                // Launch coroutine untuk error
-                launch {
-                    movieViewModel.error.collect { error ->
-                        if (error.isNotEmpty()) {
-                            Snackbar.make(recyclerView, error, Snackbar.LENGTH_LONG).show()
-                        }
-                    }
-                }
-            }
-        }
+        // 3. Bind ViewModel to XML
+        binding.viewModel = movieViewModel
+        binding.lifecycleOwner = this
     }
 }
