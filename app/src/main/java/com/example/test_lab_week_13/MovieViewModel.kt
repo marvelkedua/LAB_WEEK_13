@@ -11,13 +11,13 @@ import kotlinx.coroutines.launch
 
 class MovieViewModel(private val movieRepository: MovieRepository) : ViewModel() {
 
-    // Menggunakan StateFlow menggantikan LiveData
     private val _popularMovies = MutableStateFlow<List<Movie>>(emptyList())
     val popularMovies: StateFlow<List<Movie>> = _popularMovies
 
     private val _error = MutableStateFlow("")
     val error: StateFlow<String> = _error
 
+    // WAJIB ADA: Blok init ini yang pertama kali jalan
     init {
         fetchPopularMovies()
     }
@@ -26,15 +26,10 @@ class MovieViewModel(private val movieRepository: MovieRepository) : ViewModel()
         viewModelScope.launch(Dispatchers.IO) {
             movieRepository.fetchMovies()
                 .catch { exception ->
-                    _error.value = "An exception occurred: ${exception.message}"
+                    _error.value = "Error: ${exception.message}"
                 }
                 .collect { movies ->
-                    // --- ASSIGNMENT IMPLEMENTATION [cite: 249] ---
-                    // Mengimplementasikan kembali filter (Descending by Popularity)
-                    // Data diolah di sini sebelum dikirim ke UI
-                    val sortedMovies = movies.sortedByDescending { it.popularity }
-
-                    _popularMovies.value = sortedMovies
+                    _popularMovies.value = movies
                 }
         }
     }
