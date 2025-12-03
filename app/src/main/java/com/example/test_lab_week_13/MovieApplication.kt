@@ -1,12 +1,17 @@
 package com.example.test_lab_week_13
 
 import android.app.Application
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequest
+import androidx.work.WorkManager
 import com.example.test_lab_week_13.api.MovieService
 import com.example.test_lab_week_13.database.MovieDatabase
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory // PENTING!
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import java.util.concurrent.TimeUnit
 
 class MovieApplication : Application() {
 
@@ -15,23 +20,35 @@ class MovieApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // 1. Konfigurasi Moshi agar support Kotlin Data Class
-        val moshi = Moshi.Builder()
-            .add(KotlinJsonAdapterFactory()) // <--- INI SOLUSINYA
-            .build()
+        // --- SETUP SEBELUMNYA (JANGAN DIHAPUS) ---
+        val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 
-        // 2. Setup Retrofit dengan Moshi yang sudah dikonfigurasi
         val retrofit = Retrofit.Builder()
             .baseUrl("https://api.themoviedb.org/3/")
-            .addConverterFactory(MoshiConverterFactory.create(moshi)) // Masukkan moshi di sini
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
-
         val movieService = retrofit.create(MovieService::class.java)
 
-        // 3. Setup Database
         val movieDatabase = MovieDatabase.getInstance(applicationContext)
-
-        // 4. Setup Repository
         movieRepository = MovieRepository(movieService, movieDatabase)
+
+
+        // --- TAMBAHAN PART 3: SETUP WORK MANAGER [cite: 518-530] ---
+
+        // 1. Buat Batasan: Hanya jalan jika ada Internet
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // 2. Buat Request: Jalankan MovieWorker setiap 1 jam
+        val workRequest = PeriodicWorkRequest.Builder(
+            MovieWorker::class.java,
+            1, TimeUnit.HOURS
+        ).setConstraints(constraints)
+            .addTag("movie-work") // Tag untuk identifikasi
+            .build()
+
+        // 3. Masukkan ke Antrian Sistem
+        WorkManager.getInstance(applicationContext).enqueue(workRequest)
     }
 }
